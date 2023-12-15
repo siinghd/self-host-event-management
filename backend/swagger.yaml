@@ -1,0 +1,48 @@
+openapi: '3.0.0'
+info:
+  title: Template for Backend
+  description: Made by Harpreet Singh At @redergo
+  version: 1.1.0
+  contact:
+    email: harpreet.singh@redergo.com, h.singh8149@gmail.com
+    url: 'https://redergo.com/en/'
+
+# servers:
+#   - url: "https://localhost:3222/api/v1"
+#     description: for local host - secure
+#   - url: "http://localhost:3222/api/v2"
+#     description: for local host - regular
+
+servers:
+  - url: '{protocol}://{url}/api/{version}'
+    description: for local host
+    variables:
+      version:
+        enum:
+          - v1
+          - v2
+        default: v1
+      url:
+        enum:
+          - localhost:3222
+          - api-honpetechnology.avrean.net
+        default: localhost:3222
+      protocol:
+        enum:
+          - http
+          - https
+        default: http
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+
+paths:
+  
