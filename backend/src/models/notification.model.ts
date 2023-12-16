@@ -1,6 +1,6 @@
-import mongoose from 'mongoose';
+import mongoose, { Document, Model } from 'mongoose';
 
-const notificationSchema: mongoose.Schema = new mongoose.Schema(
+const notificationSchema = new mongoose.Schema(
   {
     content: {
       type: String,
@@ -42,14 +42,43 @@ const notificationSchema: mongoose.Schema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Based on the type of notifications
+// Add indexes as needed
 notificationSchema.index({ type: 1 });
-
-// If you're going to query based on whether the notification has been read
 notificationSchema.index({ isRead: 1 });
-
-// Timestamps for sorting
 notificationSchema.index({ createdAt: 1 });
 notificationSchema.index({ updatedAt: 1 });
 
-export = mongoose.model('Notification', notificationSchema);
+// Interface representing a document in MongoDB.
+export interface INotification extends Document {
+  content: string;
+  type:
+    | 'info'
+    | 'warning'
+    | 'alert'
+    | 'other'
+    | 'password-reset'
+    | 'user-password-reset-success';
+  subject: string;
+  targetUsers: mongoose.Types.ObjectId[];
+  targetRoles: (
+    | 'user'
+    | 'admin'
+    | 'validator'
+    | 'factory'
+    | 'manager'
+    | 'salesman'
+  )[];
+  isRead: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Interface representing the model
+export interface INotificationModel extends Model<INotification> {
+  // Define any static methods here
+}
+
+export const NotificationModel = mongoose.model<
+  INotification,
+  INotificationModel
+>('Notification', notificationSchema);

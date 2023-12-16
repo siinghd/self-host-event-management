@@ -2,7 +2,8 @@ import { Response } from 'express';
 import { IGetUserAuthInfoRequest } from '../utils/typesAndInterfaces';
 import { WhereClauseNotification } from '../utils/whereClause/WhereClauseNotification';
 import bigPromise from '../middlewares/bigPromise';
-import NotificationModel from '../models/notification.model';
+import { NotificationModel } from '../models/notification.model';
+
 
 export const updateNotificationStatus = bigPromise(
   async (req: IGetUserAuthInfoRequest, res: Response) => {
@@ -18,7 +19,7 @@ export const updateNotificationStatus = bigPromise(
         message: 'Notifications not found',
       });
     }
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Notifications updated successfully',
     });
@@ -26,6 +27,7 @@ export const updateNotificationStatus = bigPromise(
 );
 export const getNotificationBySearch = bigPromise(
   async (req: IGetUserAuthInfoRequest, res: Response) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstQ: any = {};
 
     const docsObj = new WhereClauseNotification(req.query, firstQ, req.user);

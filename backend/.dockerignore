@@ -6,3 +6,7 @@ out
 dist
 out
 build
+.env*
+.flaskenv*
+!.env.project
+!.env.vault

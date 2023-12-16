@@ -4,10 +4,11 @@ import fileUpload from 'express-fileupload';
 import cors from 'cors';
 import 'dotenv/config';
 // for swagger documentation
-import swaggerUi from 'swagger-ui-express';
-import YAML from 'yamljs';
+import * as swaggerUi from 'swagger-ui-express';
+import * as YAML from 'yamljs';
 
 // import all routes here
+import helmet from 'helmet';
 import user from './routes/user.route';
 import payment from './routes/payment.route';
 import backblaze from './routes/backblaze.route';
@@ -36,23 +37,20 @@ app.use(
     tempFileDir: '/tmp/',
   })
 );
-// cors middleware
-const whitelist = [
-  'https://honpetechnology.avrean.net',
-  'http://localhost:3000',
-  'http://localhost:3206',
-  'http://localhost:3222',
-];
+// helment
+app.use(helmet());
 
+// cors middleware
 const corsOptions: cors.CorsOptions = {
   credentials: true,
-  origin: whitelist,
+  origin: process.env.WHITE_LIST,
 };
 app.use(cors(corsOptions));
 // router middleware
 app.use('/api/v1', user);
 app.use('/api/v1', payment);
 app.use('/api/v1', notification);
+app.use('/api/v1', backblaze);
 // error handler middleware
 app.use(errorHandler);
 // export app js

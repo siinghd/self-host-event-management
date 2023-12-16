@@ -12,4 +12,5 @@ export const checkFields = BigPromise(async (req, res, next) => {
     });
   }
   next();
+  return;
 });

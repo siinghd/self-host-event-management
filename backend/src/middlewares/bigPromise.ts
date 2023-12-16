@@ -1,76 +1,78 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
-/* eslint-disable promise/no-callback-in-promise */
-/* eslint-disable max-len */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response, NextFunction } from 'express';
-
 import { CustomError } from '../utils/customError';
 import { IGetUserAuthInfoRequest } from '../utils/typesAndInterfaces';
 
-// method can be optimized with more effective error messages
 type CustomFunction = (
-  req: Request,
+  req: Request | IGetUserAuthInfoRequest,
   res: Response,
   next: NextFunction,
-  ...args: any | undefined
-) => void;
-// NOTE THIS IS NO LONGER NEED IN EXPRESS 5
-// from docs :
-// Starting with Express 5,
-// route handlers and middleware that return a Promise will call next(value)
-// automatically when they reject or throw an error.
+  ...args: unknown[]
+) => Promise<Response<any, Record<string, any>> | void>;
+
+const ERROR_MESSAGES: Record<string, string> = {
+  MongoServerError:
+    'Something went wrong with our database, we will be back soon',
+  ValidationError: 'Invalid input data.',
+  AuthError: 'Authentication error.',
+  Default: 'Internal server error.',
+};
+
+const STATUS_CODES: Record<string, number> = {
+  MongoServerError: 422,
+  ValidationError: 400,
+  AuthError: 401,
+  Default: 500,
+};
+
 export = (func: CustomFunction) =>
-  (
+  async (
     req: Request | IGetUserAuthInfoRequest,
     res: Response,
     next: NextFunction,
-    ...args: any
-  ) =>
-    Promise.resolve(func(req, res, next, ...args)).catch((e) => {
-      const errorMessage: any[] = [];
-      let statusCode = 500;
+    ...args: unknown[]
+  ): Promise<void> => {
+    try {
+      await func(req, res, next, ...args);
+    } catch (error: unknown) {
+      if (!(error instanceof Error)) {
+        return next(new CustomError('Unknown error', STATUS_CODES.Default));
+      }
 
-      if (e.name === 'MongoServerError') {
-        if (e.code === 11000) {
+      let statusCode = STATUS_CODES.Default;
+      const errorMessage: string[] = [];
+
+      if (error.name === 'MongoServerError') {
+        statusCode = STATUS_CODES.MongoServerError;
+        const mongoError = error as any; // Specific typing can be added if known
+        if (mongoError.code === 11000) {
           return next(
             new CustomError(
-              e.message ||
-                `Value already exist in our system, value :${JSON.stringify(
-                  e.keyValue
-                )}`,
-              422
+              `Value already exists: ${JSON.stringify(mongoError.keyValue)}`,
+              statusCode
             )
           );
         }
-        return next(
-          new CustomError(
-            e.message ||
-              'Something went wrong with our database, we will be back soon',
-            statusCode
-          )
-        );
-      }
-      if (e.name === 'ValidationError') {
-        statusCode = 400;
+      } else if (error.name === 'ValidationError') {
+        statusCode = STATUS_CODES.ValidationError;
       }
 
-      if (e.errors) {
-        Object.keys(e.errors).forEach((key) => {
-          errorMessage.push(`${e.errors[key].message}`);
+      if ('errors' in error) {
+        const validationError = error as any; // Specific typing can be added if known
+        Object.keys(validationError.errors).forEach((key) => {
+          if (Object.hasOwnProperty.call(validationError.errors, key)) {
+            errorMessage.push(validationError.errors[key].message);
+          }
         });
+      }
 
-        return next(
-          new CustomError(
-            errorMessage.join('|') || 'Internal server error.',
-            statusCode
-          )
-        );
-      }
-      if (
-        e.message === 'invalid token' ||
-        e.message === 'jwt malformed' ||
-        e.message === 'jwt expired'
-      ) {
-        return next(new CustomError(e.message, 401));
-      }
-      next(new CustomError(`Internal server error. ${e.message}`, statusCode));
-    });
+      const message =
+        errorMessage.length > 0
+          ? errorMessage.join('|')
+          : error.message ||
+            ERROR_MESSAGES[error.name] ||
+            ERROR_MESSAGES.Default;
+
+      next(new CustomError(message, statusCode));
+    }
+  };

@@ -28,11 +28,13 @@ export const getFileDownloadUrl = bigPromise(
 
       // Redirect the user to the authorized URL
       return res.redirect(url);
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
       return res.status(500).json({
         success: false,
         message: 'An error occurred while generating the download URL.',
-        error: error.response.data.message || error.message,
+        error: errorMessage,
       });
     }
   }

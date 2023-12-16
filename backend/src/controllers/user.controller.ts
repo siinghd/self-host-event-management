@@ -1,5 +1,3 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
-/* eslint-disable eslint-comments/no-duplicate-disable */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable consistent-return */
 // @ts-nocheck
@@ -7,10 +5,8 @@
 
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import jwt from 'jsonwebtoken';
-import { IGetUserAuthInfoRequest } from 'src/utils/typesAndInterfaces';
+import { IGetUserAuthInfoRequest } from '../utils/typesAndInterfaces';
 import { NextFunction, Response } from 'express';
-import User from '../models/user.model';
 import BigPromise from '../middlewares/bigPromise';
 import { cookieToken, veryfyJwtToken } from '../utils/tokenHelper';
 import { WhereClauseUser } from '../utils/whereClause/WhereClauseUser';
@@ -19,12 +15,15 @@ import { EmailService } from '../utils/email/emailService';
 import { RESTRICTED_UPDATE_USER_PROPERTIES_BASED_ON_ROLE } from '../utils/constants';
 import { createHtmlTemplate } from '../utils/methods';
 import { createNotification } from '../utils/dbHelpers/notification';
+import { IUserModel } from 'models/user.model';
+import * as jwt from 'jsonwebtoken';
+import { UserModel } from '../models/user.model';
 
 const emailService = new EmailService();
 
 // User Authentication Methods
 
-const removeExpiredTokens = async (user: any) => {
+const removeExpiredTokens = async (user: IUserModel) => {
   const validTokens = user.tokens.filter((token) => {
     try {
       const decoded = jwt.decode(token);
@@ -40,26 +39,33 @@ const removeExpiredTokens = async (user: any) => {
   await user.save();
 };
 
-export const signup = BigPromise(async (req, res, next) => {
-  const { name, email, password, surname, phoneNumber } = req.body;
+export const signup = BigPromise(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { name, email, password, surname, phoneNumber } = req.body;
 
-  if (!email || !name || !password) {
-    return next(new CustomError('Name, email and password are required', 400));
+    if (!email || !name || !password) {
+      return next(
+        new CustomError('Name, email, and password are required', 400)
+      );
+    }
+
+    try {
+      const user = await UserModel.create({
+        name,
+        email,
+        password,
+        surname,
+        fullName: `${name} ${surname}`,
+        phoneNumber,
+        isActive: true,
+      });
+
+      cookieToken(user, res);
+    } catch (error) {
+      next(error);
+    }
   }
-
-  const user = await User.create({
-    name,
-    email,
-    password,
-    surname,
-    fullName: `${name} ${surname}`,
-    phoneNumber,
-    isActive: true,
-  });
-
-  cookieToken(user, res);
-});
-
+);
 export const login = BigPromise(async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -69,7 +75,7 @@ export const login = BigPromise(async (req, res, next) => {
   }
 
   // get user from DB
-  const user = await User.findOne({
+  const user = await UserModel.findOne({
     email: email.toLowerCase(),
     isActive: true,
   }).select('+password +tokens');
@@ -103,7 +109,7 @@ export const login = BigPromise(async (req, res, next) => {
 export const inviteUser = BigPromise(async (req, res, next) => {
   const { name, surname, email, phoneNumber, role } = req.body;
 
-  const existingUser = await User.findOne({ email });
+  const existingUser = await UserModel.findOne({ email });
   // check for presence of email and password
   if (existingUser) {
     return next(new CustomError('User with this email already exists.', 400));
@@ -122,7 +128,7 @@ export const inviteUser = BigPromise(async (req, res, next) => {
     role: role.toLowerCase(),
   };
 
-  const user = await User.create(invitationObj);
+  const user = await UserModel.create(invitationObj);
   if (!user) {
     return next(new CustomError('User invitation failed', 400));
   }
@@ -154,7 +160,7 @@ export const inviteUser = BigPromise(async (req, res, next) => {
 
 export const checkInvitationToken = BigPromise(async (req, res, next) => {
   const { token } = req.params;
-  const user = await User.findOne({ invitationToken: token });
+  const user = await UserModel.findOne({ invitationToken: token });
   if (!user) {
     return next(new CustomError('Invalid token', 400));
   }
@@ -162,7 +168,7 @@ export const checkInvitationToken = BigPromise(async (req, res, next) => {
 });
 export const registerInvitedUser = BigPromise(async (req, res, next) => {
   const { token, password, confirmPassword, email } = req.body;
-  const user = await User.findOne({
+  const user = await UserModel.findOne({
     invitationToken: token,
     email,
   });
@@ -182,7 +188,7 @@ export const registerInvitedUser = BigPromise(async (req, res, next) => {
 export const generateRefreshToken = BigPromise(async (req, res, next) => {
   const { refreshToken } = req.body;
   // Find the user in the database
-  const user = await User.findOne({
+  const user = await UserModel.findOne({
     _id: req.user.id,
     tokens: refreshToken,
   }).select('+tokens');
@@ -219,7 +225,7 @@ export const logout = BigPromise(
       return next(new CustomError('tokens not provided', 400)); // Invalid tokens
     }
     // Remove both tokens from the user's document
-    const result = await User.updateOne(
+    const result = await UserModel.updateOne(
       { _id: req.user._id },
       { $pullAll: { tokens: [accessToken, refreshToken] } }
     );
@@ -235,7 +241,7 @@ export const logout = BigPromise(
 );
 export const logoutAllDevices = BigPromise(
   async (req: IGetUserAuthInfoRequest, res: Response, next: NextFunction) => {
-    const result = await User.updateOne(
+    const result = await UserModel.updateOne(
       { _id: req.user._id },
       { $set: { tokens: [] } },
       { new: true }
@@ -257,7 +263,7 @@ export const forgotPassword = BigPromise(async (req, res, next) => {
   const { email } = req.body;
 
   // find user in database
-  const user = await User.findOne({ email });
+  const user = await UserModel.findOne({ email });
 
   // if user not found in database
   if (!user) {
@@ -324,7 +330,7 @@ export const passwordReset = BigPromise(async (req, res, next) => {
   const encryToken = crypto.createHash('sha256').update(token).digest('hex');
 
   // find user based on hased on token and time in future
-  const user = await User.findOne({
+  const user = await UserModel.findOne({
     encryToken,
     forgotPasswordExpiry: { $gt: Date.now() },
   });
@@ -359,7 +365,7 @@ export const forgotPasswordJwt = BigPromise(async (req, res, next) => {
   const { email } = req.body;
 
   // find user in database
-  const user = await User.findOne({ email });
+  const user = await UserModel.findOne({ email });
 
   // if user not found in database
   if (!user) {
@@ -429,7 +435,7 @@ export const passwordResetJwtToken = BigPromise(async (req, res, next) => {
     return next(new CustomError('Token is invalid or expired', 400));
   }
   // find user based on hased on token and time in future
-  const user = await User.findOne({
+  const user = await UserModel.findOne({
     _id: encryToken.decoded.id,
     email: encryToken.decoded.email,
   });
@@ -463,7 +469,7 @@ export const passwordResetJwtToken = BigPromise(async (req, res, next) => {
 export const getLoggedInUserDetails = BigPromise(async (req, res) => {
   // req.user will be added by middleware
   // find user by id
-  const user = await User.findById(req.user.id).populate('factory');
+  const user = await UserModel.findById(req.user.id).populate('factory');
 
   // send response and user data
   res.status(200).json({
@@ -477,7 +483,7 @@ export const changePassword = BigPromise(async (req, res, next) => {
   const userId = req.user.id;
 
   // get user from database
-  const user = await User.findById(userId).select('+password');
+  const user = await UserModel.findById(userId).select('+password');
 
   // check if old password is correct
   const isCorrectOldPassword = await user.isValidatedPassword(
@@ -517,7 +523,7 @@ export const updateUserDetails = BigPromise(async (req, res, next) => {
   }
 
   // update the data in user
-  const user = await User.findByIdAndUpdate(
+  const user = await UserModel.findByIdAndUpdate(
     req.user.id,
     {
       $set: updateObj,
@@ -537,6 +543,7 @@ export const updateUserDetails = BigPromise(async (req, res, next) => {
 
 // Admin User Management Methods
 export const adminAllUser = BigPromise(async (req, res) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const firstQ: any = {};
   const usersObj = new WhereClauseUser(req.query, firstQ);
   const result = await usersObj.exec();
@@ -549,7 +556,7 @@ export const adminAllUser = BigPromise(async (req, res) => {
 export const adminGetOneUser = BigPromise(async (req, res, next) => {
   // get id from url and get user from database
 
-  const user = await User.findOne({ uid: req.params.id });
+  const user = await UserModel.findOne({ uid: req.params.id });
 
   if (!user) {
     next(new CustomError('No user found', 400));
@@ -576,7 +583,7 @@ export const adminUpdateUserDetails = BigPromise(async (req, res, next) => {
       new CustomError('You cannot update some properties from this route', 400)
     );
   }
-  const user = await User.findOne({ uid: req.params.id });
+  const user = await UserModel.findOne({ uid: req.params.id });
   if (!user) {
     return next(new CustomError('No Such user found', 400));
   }
@@ -593,7 +600,7 @@ export const adminUpdateUserDetails = BigPromise(async (req, res, next) => {
     }
   }
   if ('email' in updateObj) {
-    const existingUser = await User.findOne({
+    const existingUser = awaitUserModel.findOne({
       uid: { $ne: req.params.id },
       email: updateObj.email,
     });
@@ -642,7 +649,7 @@ export const adminUpdateUserDetails = BigPromise(async (req, res, next) => {
 });
 export const adminDeleteOneUser = BigPromise(async (req, res, next) => {
   // get user from url
-  const user = await User.findById(req.params.id);
+  const user = await UserModel.findById(req.params.id);
 
   if (!user) {
     return next(new CustomError('No Such user found', 400));
@@ -659,7 +666,7 @@ export const adminDeleteOneUser = BigPromise(async (req, res, next) => {
 export const adminAskForPasswordReset = BigPromise(async (req, res) => {
   // email is provided by the user we havbe to notify users with admin role that a password reset is requested
   const { email } = req.body;
-  const user = await User.findOne({ email });
+  const user = await UserModel.findOne({ email });
   if (!user) {
     return res.status(200).json({
       success: true,

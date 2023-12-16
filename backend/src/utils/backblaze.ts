@@ -1,33 +1,37 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
-/* eslint-disable no-use-before-define */
-/* eslint-disable no-await-in-loop */
-/* eslint-disable class-methods-use-this */
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
 import { callWithRetry } from './methods';
 
+interface DownloadAuthorizationTokenInfo {
+  token: string;
+  expiration: Date;
+}
+interface BucketInfo {
+  bucketId: string;
+  bucketName: string;
+}
+
+interface UploadUrlInfo {
+  uploadUrl: string;
+  uploadAuthorizationToken: string;
+}
+interface ListBucketsResponse {
+  buckets: BucketInfo[];
+}
+
 class BackblazeB2Client {
   private apiUrl: string;
-
   private authorizationToken: string | null = null;
-
   private downloadUrl: string | null = null;
-
   private authorizationExpiration: Date | null = null;
-
   private uploadUrl: string | null = null;
-
   private uploadAuthorizationToken: string | null = null;
-
   private uploadUrlExpiration: Date | null = null;
-
   private bucketName: string | null = null;
-
   private accountId: string | null = null;
-
   private downloadAuthorizationTokens: Map<
     string,
-    { token: string; expiration: Date }
+    DownloadAuthorizationTokenInfo
   > = new Map();
 
   private static instance: BackblazeB2Client | null = null;
@@ -87,26 +91,21 @@ class BackblazeB2Client {
     );
     // Clear the cache of download authorization tokens
     this.downloadAuthorizationTokens.clear();
-
     if (this.authorizationToken && !this.bucketName) {
-      const responseBuckeName = await callWithRetry(
-        async () =>
-          axios.post(
-            `${this.apiUrl}/b2_list_buckets`,
-            { accountId: this.accountId, bucketId: this.buckedId },
-            {
-              headers: {
-                Authorization: this.authorizationToken,
-              },
-            }
-          ),
-        this.retries,
-        this.retryDelay
-      );
+      const responseBucketName: AxiosResponse<ListBucketsResponse> =
+        await callWithRetry(
+          async () =>
+            axios.post(
+              `${this.apiUrl}/b2_list_buckets`,
+              { accountId: this.accountId, bucketId: this.buckedId },
+              { headers: { Authorization: this.authorizationToken } }
+            ),
+          this.retries,
+          this.retryDelay
+        );
 
-      const { buckets } = responseBuckeName.data;
-      const bucketInfo = buckets.find(
-        (bucket: any) => bucket.bucketId === this.buckedId
+      const bucketInfo = responseBucketName.data.buckets.find(
+        (bucket) => bucket.bucketId === this.buckedId
       );
       if (bucketInfo) {
         this.bucketName = bucketInfo.bucketName;
@@ -116,10 +115,7 @@ class BackblazeB2Client {
     }
   }
 
-  public async getUploadUrl(): Promise<{
-    uploadUrl: string;
-    uploadAuthorizationToken: string;
-  }> {
+  public async getUploadUrl(): Promise<UploadUrlInfo> {
     await this.authorize(); // Make sure we are authorized
 
     if (!this.authorizationToken) {

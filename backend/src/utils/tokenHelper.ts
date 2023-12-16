@@ -1,58 +1,62 @@
-  /* eslint-disable eslint-comments/disable-enable-pair */
-  /* eslint-disable no-param-reassign */
-  import { Response } from 'express';
-  import jwt from 'jsonwebtoken';
+/* eslint-disable no-param-reassign */
+import { Response } from 'express';
+import * as jwt from 'jsonwebtoken';
+import { IUserModel } from '../models/user.model';
+const cookieToken = async (user: IUserModel, res: Response) => {
+  try {
+    const accessToken = user.getJwtAccessToken();
+    const refreshToken = user.getJwtRefreshToken();
 
-  const cookieToken = async (user: any, res: Response) => {
-    try {
-      const accessToken = user.getJwtAccessToken();
-      const refreshToken = user.getJwtRefreshToken();
-      user.tokens.push(accessToken, refreshToken);
-      await user.save();
-      user.password = undefined;
-      user.tokens = undefined;
-      const options = {
-        expires: new Date(
-          Date.now() +
-            364 *
-              parseInt(process.env.COOKIE_TIME as string, 10) *
-              24 *
-              60 *
-              60 *
-              1000
-        ),
-        httpOnly: true,
-      };
+    user.tokens = user.tokens || [];
+    user.tokens.push(accessToken, refreshToken);
+
+    await user.save();
+
+    // Convert Mongoose document to a plain object
+    const userObj = user.toObject();
+
+    // Remove sensitive information
+    delete userObj.password;
+    delete userObj.tokens;
+
+    const cookieTime = parseInt(process.env.COOKIE_TIME || '7', 10); // Default to 7 days
+    const options = {
+      expires: new Date(Date.now() + cookieTime * 86400000), // 86400000 ms in a day
+      httpOnly: true,
+    };
 
     res.status(200).cookie('accessToken', accessToken, options).json({
       success: true,
       accessToken,
       refreshToken,
-      user,
+      user: userObj,
     });
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({
       success: false,
-      message: 'Error in creating jwt token',
-      code: 'JWTERR',
+      message: 'Error in creating JWT token',
+      error: errorMessage,
     });
   }
 };
-
-  const veryfyJwtToken = (token: string) => {
-    try {
-      return {
-        isValid: true,
-        // this can be syng as there are no performance diff in async and sync
-        // https://github.com/auth0/node-jsonwebtoken/issues/566
-        decoded: jwt.verify(token, process.env.JWT_ACCESS_SECRET as string),
-      };
-    } catch (err) {
-      return {
-        isValid: false,
-        err,
-      };
+const veryfyJwtToken = (token: string) => {
+  try {
+    const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
+    if (!JWT_ACCESS_SECRET) {
+      throw new Error('JWT_ACCESS_SECRET is not defined');
     }
-  };
 
-  export { cookieToken, veryfyJwtToken };
+    return {
+      isValid: true,
+      decoded: jwt.verify(token, JWT_ACCESS_SECRET),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return {
+      isValid: false,
+      error: errorMessage,
+    };
+  }
+};
+export { cookieToken, veryfyJwtToken };

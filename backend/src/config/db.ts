@@ -1,12 +1,13 @@
+/* eslint-disable no-process-exit */
 import mongoose from 'mongoose';
+import { customLogger } from '../utils/methods';
 
 const connectWithDb = () => {
   mongoose
     .connect(process.env.DATABASE_URL as string)
-    .then(() => console.log('DB GOT CONNECTED'))
+    .then(() => customLogger('', 'DB GOT CONNECTED'))
     .catch((error: Error) => {
-      console.log('DB CONNECTION ISSUES');
-      console.log(error);
+      customLogger('', 'DB CONNECTION ISSUES', error);
       process.exit(1);
     });
 };

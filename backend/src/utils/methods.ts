@@ -1,9 +1,32 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable no-await-in-loop */
 import fs from 'fs';
 import puppeteer from 'puppeteer';
 
+const customLogger = (
+  level: 'error' | 'warn' | 'info' | '',
+  ...messages: unknown[]
+) => {
+  if (process.env.NODE_ENV === 'development') {
+    switch (level) {
+      case 'error':
+        // eslint-disable-next-line no-console
+        console.error(...messages);
+        break;
+      case 'warn':
+        // eslint-disable-next-line no-console
+        console.warn(...messages);
+        break;
+      case 'info':
+        // eslint-disable-next-line no-console
+        console.info(...messages);
+        break;
+      default:
+        // eslint-disable-next-line no-console
+        console.log(...messages);
+    }
+  }
+};
 const createEdgeNGrams = (str: string) =>
   /*   if (str && str.length > 2) {
     const minGram = 2;
@@ -55,7 +78,7 @@ const readCSV = async (filePath: string) => {
 
     return parsedRows;
   } catch (error) {
-    console.error(`Error reading file from path ${filePath}`, error);
+    customLogger('error', `Error reading file from path ${filePath}`, error);
     throw error;
   }
 };
@@ -106,19 +129,19 @@ const generateHandle = (title: string): string => {
 
   return handle;
 };
-const callWithRetry = async (
-  func: () => Promise<any>,
+const callWithRetry = async <T>(
+  func: () => Promise<T>,
   retries: number = 3,
   delay: number = 1000
-): Promise<any> => {
-  let lastError;
-  for (let i = 0; i < retries; i += 1) {
+): Promise<T> => {
+  let lastError: Error | null = null;
+  for (let i = 0; i < retries; i++) {
     try {
       return await func();
     } catch (error) {
-      lastError = error;
+      lastError = error instanceof Error ? error : new Error(String(error));
       if (i < retries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise<void>((resolve) => setTimeout(resolve, delay));
       }
     }
   }
@@ -189,18 +212,21 @@ const isFieldAllowed = (field: string, allowedFields: string[]) => {
 
 const mergeAndUpdateChanges = (
   field: string,
-  updateObj: any,
-  offer: any,
-  changes: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateObj: { [key: string]: any },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  document: { [key: string]: any },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  changes: { [key: string]: any }
 ) => {
   const [parentField, subField] = field.split('.');
   const updateObjCopy = { ...updateObj };
   const changesCopy = { ...changes };
 
-  if (parentField in offer) {
+  if (parentField in document) {
     // Merge the new subfield with the existing subobject
     updateObjCopy[parentField] = {
-      ...offer[parentField], // existing subobject
+      ...document[parentField], // existing subobject
       [subField]: updateObjCopy[field], // new subfield
     };
 
@@ -353,4 +379,5 @@ export {
   createHtmlTemplate,
   generateCSV,
   safeSubtract,
+  customLogger,
 };

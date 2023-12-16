@@ -1,18 +1,56 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable func-names */
 import crypto from 'crypto';
-
 import mongoose from 'mongoose';
 import validator from 'validator';
-import argon2 from 'argon2';
-import jwt from 'jsonwebtoken';
-
+import * as argon2 from 'argon2';
+import * as jwt from 'jsonwebtoken';
 import { customAlphabet } from 'nanoid';
 import { CustomError } from '../utils/customError';
 import logger from '../utils/logger/logger';
 
 const nanoid = customAlphabet('1234567890abcdef', 6);
+
+export enum UserRole {
+  User = 'user',
+  Admin = 'admin',
+}
+
+interface BillingAddress {
+  zipCode?: string;
+  street?: string;
+  building?: string;
+  country?: string;
+  city?: string;
+  state?: string;
+}
+
+export interface IUser {
+  uid: string;
+  name: string;
+  fullName?: string;
+  surname: string;
+  email: string;
+  password: string;
+  billingAddress?: BillingAddress;
+  phoneNumber: string;
+  role: UserRole;
+  isActive: boolean;
+  invitationToken?: string;
+  tokens?: string[];
+  forgotPasswordToken?: string;
+  forgotPasswordExpiry?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IUserModel extends mongoose.Document, IUser {
+  isValidatedPassword(usersendPassword: string): Promise<boolean>;
+  getJwtAccessToken(): string;
+  getJwtRefreshToken(): string;
+  getForgotPasswordToken(): string;
+  getForgotPasswordJwtToken(): string;
+}
 
 const userSchema: mongoose.Schema = new mongoose.Schema(
   {
@@ -45,10 +83,16 @@ const userSchema: mongoose.Schema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, 'Please provide a password'],
-      minlength: [6, 'password should be atleast 6 char'],
-      select: false, // select false, we don't want to return
-      // the encrypted password in every find
-      // user must select it manually ex: await User.findOne({ email }).select('+password');
+      minlength: [6, 'Password should be at least 6 characters'],
+      select: false,
+    },
+    billingAddress: {
+      zipCode: { type: String },
+      street: { type: String },
+      building: { type: String },
+      country: { type: String },
+      city: { type: String },
+      state: { type: String },
     },
     phoneNumber: {
       type: String,
@@ -61,83 +105,70 @@ const userSchema: mongoose.Schema = new mongoose.Schema(
     },
     role: {
       type: String,
-      default: 'user',
-      enum: ['user', 'admin'],
+      default: UserRole.User,
+      enum: Object.values(UserRole),
     },
     isActive: { type: Boolean, default: false },
     invitationToken: { type: String },
     tokens: [{ type: String, select: false }],
-    forgotPasswordToken: String,
-    forgotPasswordExpiry: Date,
+    forgotPasswordToken: { type: String },
+    forgotPasswordExpiry: { type: Date },
   },
   { timestamps: true }
 );
 
-// encrypt password before save - HOOKS
-userSchema.pre('save', async function (next) {
+userSchema.pre<IUserModel>('save', async function (next) {
   if (!this.isModified('password')) {
     return next();
   }
   try {
     this.password = await argon2.hash(this.password);
-  } catch (err: any) {
+  } catch (err) {
     this.password = '';
     next(new CustomError('Error in Encrypting the user password.', 422));
   }
 });
-// // Create a virtual property `fullName` that's computed from `firstname and lastname`.
-// userSchema.virtual('fullName').get(function () {
-//   return `${this.name} ${this.surname}}`;
-// });
-// validate the password with passed on user password
+
 userSchema.methods.isValidatedPassword = async function (
   usersendPassword: string
-) {
+): Promise<boolean> {
   try {
     return await argon2.verify(this.password, usersendPassword);
-  } catch (err: any) {
+  } catch (err) {
     logger.error({
       message: 'Error in isValidatedPassword, could not validate the password',
       meta: {
-        stack: err.stack || '',
+        stack: (err as Error).stack || '',
         method: 'userSchema.methods.isValidatedPassword',
       },
     });
+    return false;
   }
 };
 
-// create and return jwt access token
-userSchema.methods.getJwtAccessToken = function () {
+userSchema.methods.getJwtAccessToken = function (): string {
   return jwt.sign({ id: this._id }, process.env.JWT_ACCESS_SECRET as string, {
     expiresIn: process.env.JWT_ACCESS_EXPIRY,
   });
 };
-// create and return jwt REFRESH token
-userSchema.methods.getJwtRefreshToken = function () {
+
+userSchema.methods.getJwtRefreshToken = function (): string {
   return jwt.sign({ id: this._id }, process.env.JWT_REFRESH_SECRET as string, {
     expiresIn: process.env.JWT_REFRESH_EXPIRY,
   });
 };
-// generate forgot password token (string) // db solution
-userSchema.methods.getForgotPasswordToken = function () {
-  // generate a long and randomg string
-  const forgotToken = crypto.randomBytes(20).toString('hex');
 
-  // getting a hash - make sure to get a hash on backend
+userSchema.methods.getForgotPasswordToken = function (): string {
+  const forgotToken = crypto.randomBytes(20).toString('hex');
   this.forgotPasswordToken = crypto
     .createHash('sha256')
     .update(forgotToken)
     .digest('hex');
-
-  // time of token
   this.forgotPasswordExpiry = Date.now() + 20 * 60 * 1000;
-
   return forgotToken;
 };
 
-// generate forgot password token (string) // jwt Token solution
-userSchema.methods.getForgotPasswordJwtToken = function () {
-  // generate jwt token with id and email(not needed)
+userSchema.methods.getForgotPasswordJwtToken = function (): string {
   return jwt.sign(
     { id: this._id, email: this.email },
     process.env.JWT_SECRET as string,
@@ -147,23 +178,12 @@ userSchema.methods.getForgotPasswordJwtToken = function () {
   );
 };
 
-// Index for unique fields
 userSchema.index({ uid: 1 });
 userSchema.index({ email: 1 });
-
-// Index for frequently queried fields
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
-
-
-// Index for text-based searches (if needed)
-// userSchema.index({ name: 'text', surname: 'text' });
-
-// Index for timestamps
 userSchema.index({ createdAt: 1 });
 userSchema.index({ updatedAt: 1 });
-
-// Index for fields that might be used in sorting or filtering
 userSchema.index({ phoneNumber: 1 });
 
-export = mongoose.model('User', userSchema);
+export const UserModel = mongoose.model<IUserModel>('User', userSchema);

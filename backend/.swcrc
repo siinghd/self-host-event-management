@@ -1,0 +1,16 @@
+{
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "tsx": false,
+      "decorators": true,
+      "dynamicImport": true
+    },
+    "target": "es2021",
+    "transform": {}
+  },
+  "module": {
+    "type": "commonjs" // can be "es6", "umd", or "amd"
+  },
+  "sourceMaps": true
+}

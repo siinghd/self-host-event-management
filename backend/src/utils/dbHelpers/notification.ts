@@ -1,65 +1,59 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable no-await-in-loop */
-// replace with your actual path
-
-import UserModel from '../../models/user.model';
-import NotificationModel from '../../models/notification.model';
+import { NotificationModel, INotification } from '../../models/notification.model';
 import { EmailService } from '../email/emailService';
-import { createHtmlTemplate } from '../methods';
+import { createHtmlTemplate, customLogger } from '../methods';
+import { UserModel } from '../../models/user.model';
 
 const emailService = new EmailService();
+
+interface CreateNotificationParams {
+  content: string;
+  type?: string;
+  subject?: string;
+  targetUsers?: string[]; // Assuming targetUsers are array of User IDs
+  targetRoles?: string[]; // Assuming targetRoles are array of Role strings
+}
 
 const createNotification = async ({
   content,
   type = 'info',
-  subject = 'Updates from HONPE PORTAL',
+  subject = 'Updates from Event software',
   targetUsers = [],
   targetRoles = [],
-}: {
-  content?: any;
-  type?: string;
-  subject?: string;
-  targetUsers?: any;
-  targetRoles?: any;
-}) => {
-  const notification = new NotificationModel({
-    content,
-    type,
-    subject,
-    targetUsers,
-    targetRoles,
-  });
-
-  await notification.save();
-
-  const emailAddresses: string[] = [];
-  // If targeting a specific user
-  // Utility function to send emails
-
-  if (targetUsers && targetUsers.length > 0) {
-    const users = await UserModel.find({ _id: { $in: targetUsers } });
-    for (const user of users) {
-      emailAddresses.push(user.email);
-    }
-  }
-
-  // If targeting a role
-  if (targetRoles && targetRoles.length > 0) {
-    const users = await UserModel.find({ role: { $in: targetRoles } });
-    for (const user of users) {
-      emailAddresses.push(user.email);
-    }
-  }
-
-  // Send the email to all addresses
-  if (emailAddresses.length > 0) {
-    await emailService.sendEmailViaNodeMailer({
-      to: emailAddresses, // Pass the array here
+}: CreateNotificationParams) => {
+  try {
+    const notification: INotification = new NotificationModel({
+      content,
+      type,
       subject,
-      text: content,
-      html: createHtmlTemplate('User', content, subject), // Modify this as needed
+      targetUsers,
+      targetRoles,
     });
+
+    await notification.save();
+
+    const emailAddresses: string[] = [];
+
+    if (targetUsers.length > 0) {
+      const users = await UserModel.find({ _id: { $in: targetUsers } });
+      users.forEach((user) => emailAddresses.push(user.email));
+    }
+
+    if (targetRoles.length > 0) {
+      const users = await UserModel.find({ role: { $in: targetRoles } });
+      users.forEach((user) => emailAddresses.push(user.email));
+    }
+
+    if (emailAddresses.length > 0) {
+      await emailService.sendEmailViaNodeMailer({
+        to: emailAddresses,
+        subject,
+        text: content,
+        html: createHtmlTemplate('User', content, subject),
+      });
+    }
+  } catch (error) {
+    customLogger('error', 'Error in createNotification:', error);
+    throw error; // Or handle it as per your application's error handling policy
   }
 };
 

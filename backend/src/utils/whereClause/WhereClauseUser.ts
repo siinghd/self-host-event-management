@@ -1,63 +1,47 @@
-// base - User.find()
-// base - User.find(name: {"Singh"})
-import User from '../../models/user.model';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import mongoose from 'mongoose';
+import { IUser, UserModel } from '../../models/user.model'; // Assuming IUser is your User model interface
 import { MAX_QUERY_LIMIT } from '../constants';
 
-// bigQ - //search=singh&role=1&views[gte]=4000
-// &views[lte]=9999&page=2&limit=5
+interface QueryOptions {
+  search?: {
+    name?: string;
+    uid?: string;
+  };
+  select?: string;
+  populate?: string;
+  sort?: string;
+  page?: string;
+  limit?: number;
+  [key: string]: any;
 
-// Possibile use can be :
-/* const totalcountUser = await User.countDocuments();
+}
 
-    const usersObj = new WhereClause(User.find(), req.query)
-    .search()
-    .filter();
-
-    let users = await usersObj.base;
-    const filteredUsersNumber = users.length;
-
-    usersObj.pager();
-    users = await usersObj.base.clone();
-
-    res.status(200).json({
-        success: true,
-        users,
-        filteredUsersNumber,
-        totalcountUser,
-    });
-*/
 class WhereClauseUser {
-  user: any;
-
-  base: any;
-
-  totalcountDocument: any;
-
-  bigQ: any;
-
+  base: mongoose.Query<IUser[], IUser>;
+  bigQ: QueryOptions;
+  user: IUser | null;
+  totalCountDocument: number = 0; 
   totalPages = -1;
-
   filteredUsersNumber = -1;
-
   page = -1;
-
   previousPage = -1;
-
   nextPage = -1;
-
   limit = 20;
-
   currentPage = 1;
 
-  constructor(bigQ: any, firstQueryObject = {}, user = null) {
-    this.base = User.find(firstQueryObject);
+  constructor(
+    bigQ: QueryOptions,
+    firstQueryObject = {},
+    user: IUser | null = null
+  ) {
+    this.base = UserModel.find(firstQueryObject);
     this.bigQ = bigQ;
     this.user = user;
   }
-
   search() {
     // modify this if you have more search terms in the search
-    const searchword: any = {};
+    const searchword: { [key: string]: any } = {};
     if (this.bigQ.search) {
       if (this.bigQ.search.name) {
         searchword.name = {
@@ -114,8 +98,8 @@ class WhereClauseUser {
     return this;
   }
 
-  totalDocuments() {
-    this.totalcountDocument = User.estimatedDocumentCount();
+  async totalDocuments() {
+    this.totalCountDocument = await this.base.estimatedDocumentCount();
     return this;
   }
 
@@ -183,12 +167,12 @@ class WhereClauseUser {
     if (documents.length === this.limit) {
       this.nextPage = this.currentPage + 1;
     }
-    const totalDocumentsCount = await this.totalcountDocument;
+
     /*  const totalPagesCount = this.totalPages; */
     /* const { filteredDocumentsNumber } = this; */
     return {
       documents,
-      totalDocumentsCount,
+      totalCountDocument: this.totalCountDocument,
       /*  totalPagesCount, */
       previousPage: this.previousPage,
       page: this.page,

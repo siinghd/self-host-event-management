@@ -1,8 +1,13 @@
 const MAX_QUERY_LIMIT = 100;
 const MIN_QUERY_LIMIT = 1;
 
-// role-specific data
-const ROLE_MAP: any = {
+interface RoleConfiguration {
+  required: string[];
+  allowed: string[];
+  handler: () => void;
+}
+
+const ROLE_MAP: Record<string, RoleConfiguration> = {
   user: {
     required: ['x'],
     allowed: ['x'],
@@ -15,10 +20,6 @@ const ROLE_MAP: any = {
   },
 };
 
-const USER_ROLES = {
-  user: 'user',
-  admin: 'admin',
-};
 
 const RESTRICTED_UPDATE_USER_PROPERTIES_BASED_ON_ROLE = {
   admin: [
@@ -40,6 +41,5 @@ export {
   MAX_QUERY_LIMIT,
   MIN_QUERY_LIMIT,
   ROLE_MAP,
-  USER_ROLES,
   RESTRICTED_UPDATE_USER_PROPERTIES_BASED_ON_ROLE,
 };

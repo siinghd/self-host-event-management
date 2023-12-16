@@ -1,27 +1,36 @@
-import { NextFunction, Request, Response } from 'express';
-
+import { Request, Response } from 'express';
 import logger from '../utils/logger/logger';
 
-const errorHandler = (
-  err: any,
-  req: Request,
-  res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  next: NextFunction
-) => {
+interface AppError extends Error {
+  status?: number;
+}
+
+const errorHandler = (err: AppError, req: Request, res: Response) => {
+  const status = err.status || 500;
+
   logger.error({
     message: err.message || 'Internal server error.',
     meta: {
       stack: err.stack || '',
-      status: err.status || 500,
-      method: 'errorHandler',
+      status: status,
+      method: req.method,
+      url: req.url,
     },
   });
-  return res.status(err.status).json({
-    status: err.status,
-    success: false,
-    message: err.message,
-  });
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(status).json({
+      status: status,
+      success: false,
+      message: 'An error occurred.',
+    });
+  } else {
+    return res.status(status).json({
+      status: status,
+      success: false,
+      message: err.message || 'Internal server error.',
+    });
+  }
 };
 
 export = errorHandler;

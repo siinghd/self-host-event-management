@@ -20,12 +20,12 @@ servers:
       version:
         enum:
           - v1
-          - v2
+          #- v2
         default: v1
       url:
         enum:
           - localhost:3222
-          - api-honpetechnology.avrean.net
+          #- api-honpetechnology.avrean.net
         default: localhost:3222
       protocol:
         enum:
