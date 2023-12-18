@@ -43,14 +43,17 @@ app.use(helmet());
 // cors middleware
 const corsOptions: cors.CorsOptions = {
   credentials: true,
-  origin: process.env.WHITE_LIST,
+  origin: process.env.WHITE_LIST?.split(','),
 };
 app.use(cors(corsOptions));
+
 // router middleware
+app.get('/', (req, res) => res.send('ok'));
 app.use('/api/v1', user);
 app.use('/api/v1', payment);
 app.use('/api/v1', notification);
 app.use('/api/v1', backblaze);
+app.get('*', (req, res) => res.status(404).send('Not Found'));
 // error handler middleware
 app.use(errorHandler);
 // export app js
