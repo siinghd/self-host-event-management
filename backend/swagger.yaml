@@ -196,7 +196,7 @@ paths:
                     type: string
                   error:
                     type: string
-  /user/login:
+  /users/login:
     post:
       summary: Log in an existing user
       description: Log in a user with email, password, and deviceId
@@ -264,7 +264,7 @@ paths:
                   error:
                     type: string
 
-  /user/refresh-token:
+  /users/refresh-token:
     
     post:
       summary: Generate a new refresh token
@@ -319,7 +319,7 @@ paths:
                     type: string
                   error:
                     type: string
-  /user/logout:
+  /users/logout:
     post:
       tags:
         - User
