@@ -90,8 +90,9 @@ jobs:
           echo "DOTENV_KEY=${{ env.PROD_DOTENV_KEY }}" >> $GITHUB_ENV
 
       - name: SSH and Prepare Server
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.0.0
         with:
+          timeout: 120s
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           password: ${{ env.SERVER_PASSWORD }}
@@ -107,12 +108,13 @@ jobs:
           source: ${{ env.CURR_WORKING_DIRECTORY }}
           target: /home/${{ env.SERVER_USER }}/sites/${{ env.PROJECT_NAME }}/${{ env.ENVIRONMENT }}/
       - name: Deploy
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.0.0
         with:
+          timeout: 120s
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           password: ${{ env.SERVER_PASSWORD }}
           script: |
             ansible-playbook /home/${{ env.SERVER_USER }}/ansible/start_script_pnpm.ansible.yml -e "dotenv_key=${{env.DOTENV_KEY}} env_environment=${{ env.ENVIRONMENT }} project_name=${{ env.PROJECT_NAME }} project_type=${{ env.PROJECT_TYPE }} app_port=${{ env.APP_PORT }} working_directory=${{ env.WORKING_DIRECTORY }}"
-            ansible-playbook /home/${{ env.SERVER_USER }}/ansible/start_nginx_conf.ansible.yml -e "ansible_become_pass=${{ env.SERVER_PASSWORD }} env_type=${{ env.ENVIRONMENT }} project_name=${{ env.PROJECT_NAME }} project_type=${{ env.PROJECT_TYPE }} app_port=${{ env.APP_PORT }} working_directory=${{ env.WORKING_DIRECTORY }} server_name=${{ env.DOMAIN_NAME }} enable_rate_limiting=${{env.ENABLE_RATE_LIMITING}} rate_burst=${{env.RATE_BURST}} enable_cache=${{env.ENABLE_CACHE}} enable_cache_control=${{env.ENABLE_CACHE_CONTROL}}"
+            ansible-playbook /home/${{ env.SERVER_USER }}/ansible/set_nginx_conf.ansible.yml -e "ansible_become_pass=${{ env.SERVER_PASSWORD }} env_type=${{ env.ENVIRONMENT }} project_name=${{ env.PROJECT_NAME }} project_type=${{ env.PROJECT_TYPE }} app_port=${{ env.APP_PORT }} working_directory=${{ env.WORKING_DIRECTORY }} server_name=${{ env.DOMAIN_NAME }} enable_rate_limiting=${{env.ENABLE_RATE_LIMITING}} rate_burst=${{env.RATE_BURST}} enable_cache=${{env.ENABLE_CACHE}} enable_cache_control=${{env.ENABLE_CACHE_CONTROL}}"
            
