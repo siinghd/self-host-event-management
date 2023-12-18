@@ -9,7 +9,7 @@ import { customAlphabet } from 'nanoid';
 import { CustomError } from '../utils/customError';
 import logger from '../utils/logger/logger';
 
-const nanoid = customAlphabet('1234567890abcdef', 6);
+const nanoid = customAlphabet('1234567890abcdef', 10);
 
 export enum UserRole {
   User = 'user',
@@ -37,7 +37,11 @@ export interface IUser {
   role: UserRole;
   isActive: boolean;
   invitationToken?: string;
-  tokens?: string[];
+  tokens?: Array<{
+    accessToken: string;
+    refreshToken: string;
+    deviceId: string;
+  }>;
   forgotPasswordToken?: string;
   forgotPasswordExpiry?: Date;
   createdAt?: Date;
@@ -50,6 +54,11 @@ export interface IUserModel extends mongoose.Document, IUser {
   getJwtRefreshToken(): string;
   getForgotPasswordToken(): string;
   getForgotPasswordJwtToken(): string;
+  addOrUpdateDeviceToken(
+    deviceId: string,
+    accessToken: string,
+    refreshToken: string
+  ): void;
 }
 
 const userSchema: mongoose.Schema = new mongoose.Schema(
@@ -64,9 +73,6 @@ const userSchema: mongoose.Schema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide a name'],
       maxlength: [40, 'Name should be under 40 characters'],
-    },
-    fullName: {
-      type: String,
     },
     surname: {
       type: String,
@@ -110,12 +116,24 @@ const userSchema: mongoose.Schema = new mongoose.Schema(
     },
     isActive: { type: Boolean, default: false },
     invitationToken: { type: String },
-    tokens: [{ type: String, select: false }],
+    tokens: [
+      {
+        accessToken: { type: String },
+        refreshToken: { type: String },
+        deviceId: { type: String },
+      },
+    ],
     forgotPasswordToken: { type: String },
     forgotPasswordExpiry: { type: Date },
   },
   { timestamps: true }
 );
+
+userSchema.virtual('fullName').get(function () {
+  return `${this.name} ${this.surname}`;
+});
+userSchema.set('toJSON', { virtuals: true });
+userSchema.set('toObject', { virtuals: true });
 
 userSchema.pre<IUserModel>('save', async function (next) {
   if (!this.isModified('password')) {
@@ -176,6 +194,42 @@ userSchema.methods.getForgotPasswordJwtToken = function (): string {
       expiresIn: process.env.JWT_PASSWORD_RESET_EXPIRY,
     }
   );
+};
+userSchema.methods.addOrUpdateDeviceToken = async function (
+  this: IUserModel,
+  deviceId: string,
+  accessToken: string,
+  refreshToken: string
+): Promise<void> {
+  if (!this.tokens) {
+    this.tokens = [];
+  }
+
+  this.tokens = this.tokens.filter((tokenInfo) => {
+    try {
+      jwt.verify(tokenInfo.accessToken, process.env.JWT_ACCESS_SECRET || '');
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  // Then, add or update the device token
+  const existingTokenIndex = this.tokens.findIndex(
+    (token) => token.deviceId === deviceId
+  );
+
+  if (existingTokenIndex !== -1) {
+    // Update existing tokens for this device
+    this.tokens[existingTokenIndex].accessToken = accessToken;
+    this.tokens[existingTokenIndex].refreshToken = refreshToken;
+  } else {
+    // Add new tokens for this device
+    this.tokens.push({ deviceId, accessToken, refreshToken });
+  }
+
+  // Save the updated user document
+  await this.save();
 };
 
 userSchema.index({ uid: 1 });

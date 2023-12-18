@@ -1,150 +1,135 @@
 import { Router } from 'express';
 import { check } from 'express-validator';
-
-import {
-  signup,
-  login,
-  logout,
-  /*   forgotPassword,
-  passwordReset, */
-  getLoggedInUserDetails,
-  /*   changePassword, */
-  adminAllUser,
-  adminDeleteOneUser,
-  adminGetOneUser,
-  /*   forgotPasswordJwt,
-  passwordResetJwtToken, */
-  logoutAllDevices,
-  generateRefreshToken,
-  inviteUser,
-  checkInvitationToken,
-  registerInvitedUser,
-  updateUserDetails,
-  adminUpdateUserDetails,
-  adminAskForPasswordReset,
-} from '../controllers/user.controller';
-import { checkFields } from '../middlewares/fieldsValidation';
+import * as userController from '../controllers/user.controller';
+import * as fieldsValidationMiddleware from '../middlewares/fieldsValidation';
 import { isLoggedIn, customRole } from '../middlewares/user';
+import * as zodValidate from '../middlewares/zodValidate';
+import * as userSchemas from '../zodSchemas';
+import { UserRole } from '../models/user.model';
 
 const router: Router = Router();
 
+// User Authentication Routes
+router.post(
+  '/users/signup',
+  zodValidate.validate(userSchemas.signupSchema),
+  userController.signup
+);
+router.post(
+  '/users/login',
+  zodValidate.validate(userSchemas.loginSchema),
+  userController.login
+);
+router.post(
+  '/users/logout',
+  isLoggedIn,
+  zodValidate.validate(userSchemas.logoutSchema),
+  userController.logout
+);
+router.get(
+  '/users/logout-all-devices',
+  isLoggedIn,
+  userController.logoutAllDevices
+);
+router.post(
+  '/users/refresh-token',
+  isLoggedIn,
+  refreshTokenValidation(),
+  fieldsValidationMiddleware.checkFields,
+  userController.generateRefreshToken
+);
+
+// User Invitation Routes
+router.get(
+  '/users/invitations/validate/:token',
+  userController.checkInvitationToken
+);
+router.post(
+  '/users/invitations/register',
+  invitationRegisterValidation(),
+  fieldsValidationMiddleware.checkFields,
+  userController.registerInvitedUser
+);
+
+// Password Reset (JWT)
+router.post(
+  '/users/password-reset/request-jwt',
+  userController.forgotPasswordJwt
+);
+router.post(
+  '/users/password-reset/confirm-jwt/:token',
+  userController.passwordResetJwtToken
+);
+
+// Password Reset (Database) - Commented
+// router.post('/users/password-reset/request', userController.forgotPassword);
+// router.post('/users/password-reset/confirm/:token', userController.passwordReset);
+
+// User Profile Routes
 router
-  .route('/user/signup')
-  .post(
-    [
-      check('name').not().isEmpty().withMessage('Name must be provided'),
-      check('email')
-        .not()
-        .isEmpty()
-        .withMessage('Name must be provided')
-        .isEmail()
-        .withMessage('Email must be in valid format'),
-      check('password')
-        .not()
-        .isEmpty()
-        .withMessage('Password must be provided')
-        .isLength({ min: 6 })
-        .withMessage('Password must be at least 6 characters long'),
-    ],
-    checkFields,
-    signup
-  );
-router.route('/user/login').post(login);
+  .route('/users/profile')
+  .get(isLoggedIn, userController.getLoggedInUserDetails)
+  .put(isLoggedIn, userController.updateUserDetails);
+
+// Change Password (Commented)
+// router.post('/users/password-change', isLoggedIn, userController.changePassword);
+
+// Admin Password Reset Request
+router.post(
+  '/admin/users/password-reset/request',
+  [check('email').notEmpty().withMessage('Email must be provided')],
+  fieldsValidationMiddleware.checkFields,
+  userController.adminAskForPasswordReset
+);
+
+// Admin User Management Routes
+router.get(
+  '/admin/users',
+  isLoggedIn,
+  customRole(UserRole.Admin),
+  userController.adminAllUser
+);
+router.post(
+  '/admin/users/invitations',
+  isLoggedIn,
+  zodValidate.validate(userSchemas.inviteUserSchema),
+  customRole(UserRole.Admin),
+  userController.inviteUser
+);
 router
-  .route('/user/logout')
-  .post(
+  .route('/admin/users/:userId')
+  .get(isLoggedIn, customRole(UserRole.Admin), userController.adminGetOneUser)
+  .put(
     isLoggedIn,
-    [
-      check('refreshToken')
-        .not()
-        .isEmpty()
-        .withMessage('Refresh token is required'),
-    ],
-    checkFields,
-    logout
-  );
-router.route('/user/logoutalldevices').get(isLoggedIn, logoutAllDevices);
-router
-  .route('/user/refreshtoken')
-  .post(
+    customRole(UserRole.Admin),
+    userController.adminUpdateUserDetails
+  )
+  .delete(
     isLoggedIn,
-    [
-      check('refreshToken')
-        .not()
-        .isEmpty()
-        .withMessage('Refresh token is required'),
-    ],
-    checkFields,
-    generateRefreshToken
-  );
-router.route('/user/invite/validate/:token').get(checkInvitationToken);
-router
-  .route('/user/invite/register')
-  .post(
-    [
-      check('email').not().isEmpty().withMessage('Email must be provided'),
-      check('password')
-        .not()
-        .isEmpty()
-        .withMessage('Password must be provided'),
-      check('confirmPassword')
-        .not()
-        .isEmpty()
-        .withMessage('Confirm Password must be provided'),
-      check('token').not().isEmpty().withMessage('Token must be provided'),
-    ],
-    checkFields,
-    registerInvitedUser
+    customRole(UserRole.Admin),
+    userController.adminDeleteOneUser
   );
 
-/* // jwt reset pass
-router.route('/user/forgotpasswordjwt').post(forgotPasswordJwt);
-router.route('/user/password/resetjwt/:token').post(passwordResetJwtToken);
-// db reset pass
-router.route('/user/forgotpassword').post(forgotPassword);
-router.route('/user/password/reset/:token').post(passwordReset); */
+export default router;
 
-router
-  .route('/user/me')
-  .get(isLoggedIn, getLoggedInUserDetails)
-  .put(isLoggedIn, updateUserDetails);
-// router.route('/user/password/update').post(isLoggedIn, changePassword);
-router
-  .route('/user/forgot-password')
-  .post(
-    [check('email').notEmpty().withMessage('Email must be provided')],
-    checkFields,
-    adminAskForPasswordReset
-  );
+// Helper functions for validation
+function refreshTokenValidation() {
+  return [
+    check('refreshToken')
+      .not()
+      .isEmpty()
+      .withMessage('Refresh token is required'),
+  ];
+}
 
-// router.route('/user/userdashboard/update').post(isLoggedIn, updateUserDetails);
-
-// admin only routes
-router
-  .route('/user/admin/user/search')
-  .get(isLoggedIn, customRole('admin', 'salesman', 'manager'), adminAllUser);
-router
-  .route('/user/admin/invite')
-  .post(
-    isLoggedIn,
-    [
-      check('name').not().isEmpty().withMessage('Name must be provided'),
-      check('email').not().isEmpty().withMessage('Email must be provided'),
-      check('phoneNumber')
-        .not()
-        .isEmpty()
-        .withMessage('Phone number must be provided'),
-      check('surname').not().isEmpty().withMessage('Surname must be provided'),
-      check('role').not().isEmpty().withMessage('Role must be provided'),
-    ],
-    checkFields,
-    customRole('admin'),
-    inviteUser
-  );
-router
-  .route('/user/admin/user/:id')
-  .get(isLoggedIn, customRole('admin', 'manager'), adminGetOneUser)
-  .put(isLoggedIn, customRole('admin', 'manager'), adminUpdateUserDetails)
-  .delete(isLoggedIn, customRole('admin'), adminDeleteOneUser);
-
-export = router;
+function invitationRegisterValidation() {
+  return [
+    check('email').not().isEmpty().withMessage('Email must be provided'),
+    check('password').not().isEmpty().withMessage('Password must be provided'),
+    check('confirmPassword')
+      .not()
+      .isEmpty()
+      .withMessage('Confirm Password must be provided'),
+    check('token').not().isEmpty().withMessage('Token must be provided'),
+  ];
+}

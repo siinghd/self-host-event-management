@@ -29,11 +29,23 @@ export const isLoggedIn = BigPromise(
       ) as jwt.JwtPayload;
       const user = await UserModel.findById(decoded.id).select('+tokens');
 
-      if (!user || !user.tokens?.includes(accessToken)) {
+      if (!user) {
         return res.status(401).json({
           success: false,
           message: 'User not found, it can be due to expired token',
           code: 'USRNF',
+        });
+      }
+
+      // Check if the accessToken is present in the user's tokens array
+      const tokenExists = user.tokens?.some(
+        (tokenInfo) => tokenInfo.accessToken === accessToken
+      );
+      if (!tokenExists) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token or token expired',
+          code: 'INVALTKN',
         });
       }
 
