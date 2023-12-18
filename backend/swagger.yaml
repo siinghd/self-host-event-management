@@ -1,17 +1,11 @@
-openapi: '3.0.0'
+openapi: '3.0.3'
 info:
-  title: Template for Backend
+  title: Self host event managemt
   description: Made by Harpreet Singh At @redergo
   version: 1.1.0
   contact:
     email: harpreet.singh@redergo.com, h.singh8149@gmail.com
     url: 'https://redergo.com/en/'
-
-# servers:
-#   - url: "https://localhost:3222/api/v1"
-#     description: for local host - secure
-#   - url: "http://localhost:3222/api/v2"
-#     description: for local host - regular
 
 servers:
   - url: '{protocol}://{url}/api/{version}'
@@ -20,12 +14,11 @@ servers:
       version:
         enum:
           - v1
-          #- v2
         default: v1
       url:
         enum:
           - localhost:3222
-          #- api-honpetechnology.avrean.net
+          - api-dev-shem.hsingh.site
         default: localhost:3222
       protocol:
         enum:
@@ -43,6 +36,544 @@ components:
       type: apiKey
       in: cookie
       name: token
-
+  schemas:
+    BillingAddress:
+      type: object
+      properties:
+        zipCode:
+          type: string
+        street:
+          type: string
+        building:
+          type: string
+        country:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+    Token:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        deviceId:
+          type: string
+    User:
+      type: object
+      required:
+        - uid
+        - name
+        - surname
+        - email
+        - password
+        - phoneNumber
+        - role
+        - isActive
+      properties:
+        uid:
+          type: string
+        name:
+          type: string
+        surname:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        billingAddress:
+          $ref: '#/components/schemas/BillingAddress'
+        phoneNumber:
+          type: string
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+        isActive:
+          type: boolean
+        invitationToken:
+          type: string
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Token'
+        forgotPasswordToken:
+          type: string
+        forgotPasswordExpiry:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+tags:
+  - name: User
+    description: Operations about user
+    
 paths:
-  
+  /users/signup:
+    post:
+      summary: Sign up a new user
+      description: Register a new user with name, email, password, surname, phoneNumber, and `deviceId`
+                   
+      operationId: signup
+      tags: [User]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The user's name
+                email:
+                  type: string
+                  format: email
+                  description: The user's email address
+                password:
+                  type: string
+                  description: The user's password
+                surname:
+                  type: string
+                  description: The user's surname
+                phoneNumber:
+                  type: string
+                  description: The user's phone number
+                deviceId:
+                  type: string
+                  description: The user's device ID
+              required:
+                - name
+                - email
+                - password
+                - deviceId
+      responses:
+        '200':
+          description: User signed up successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Name, email, deviceId and password are required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in creating JWT token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string
+  /user/login:
+    post:
+      summary: Log in an existing user
+      description: Log in a user with email, password, and deviceId
+      operationId: login
+      tags: [User]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: The user's email address
+                password:
+                  type: string
+                  description: The user's password
+                deviceId:
+                  type: string
+                  description: The user's device ID
+              required:
+                - email
+                - password
+                - deviceId
+      responses:
+        '200':
+          description: User logged in successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Email, password, and deviceId are required or Email or password does not match, exist or User is not been activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in creating JWT token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /user/refresh-token:
+    
+    post:
+      summary: Generate a new refresh token
+      description: Generate a new refresh token for a user with a valid access token
+      operationId: generateRefreshToken
+      tags: [User]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accessToken:
+                  type: string
+                  description: The user's valid access token
+              required:
+                - accessToken
+      responses:
+        '200':
+          description: Refresh token generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  refreshToken:
+                    type: string
+        '400':
+          description: Access token is required or invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in generating refresh token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string
+  /user/logout:
+    post:
+      tags:
+        - User
+      summary: Log out a user from the current device
+      description: Log out a user from the current device using a valid access token
+      operationId: logout
+      responses:
+        '200':
+          description: User logged out successfully from the current device
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized, valid access token required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in logging out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /users/logout-all-devices:
+    get:
+      tags:
+        - User
+      summary: Log out a user from all devices
+      description: Log out a user from all devices using a valid access token
+      operationId: logoutAllDevices
+      responses:
+        '200':
+          description: User logged out successfully from all devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized, valid access token required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in logging out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /users/password-reset/request-jwt:
+    post:
+      tags:
+        - User
+      summary: Generate a JWT for password reset
+      description: Generate a JWT for password reset
+      operationId: forgotPasswordJwt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: The user's email address
+              required:
+                - email
+      responses:
+        '200':
+          description: JWT for password reset generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  jwt:
+                    type: string
+        '400':
+          description: Email is required or invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in generating JWT for password reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string
+  /users/password-reset/confirm-jwt/:token:
+    post:
+      tags:
+        - User
+      summary: Reset password using JWT token
+      description: Reset password using JWT token
+      operationId: passwordResetJwtToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jwt:
+                  type: string
+                  description: The JWT token for password reset
+                newPassword:
+                  type: string
+                  description: The new password
+              required:
+                - jwt
+                - newPassword
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: JWT and new password are required or invalid JWT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in resetting password
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /users/profile:
+    get:
+      tags:
+        - User
+      summary: Get the details of the logged in user
+      description: Get the details of the logged in user
+      operationId: getLoggedInUserDetails
+      responses:
+        '200':
+          description: User details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      surname:
+                        type: string
+                      phoneNumber:
+                        type: string
+                      deviceId:
+                        type: string
+        '401':
+          description: Unauthorized, valid access token required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Error in retrieving user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  error:
+                    type: string

@@ -2,15 +2,26 @@
 import { Response } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { IUserModel } from '../models/user.model';
-const cookieToken = async (user: IUserModel, res: Response) => {
+
+const cookieToken = async (
+  user: IUserModel,
+  res: Response,
+  deviceId: string
+) => {
+  if (!deviceId) {
+    res.status(400).json({
+      success: false,
+      message: 'Device ID is required for token generation',
+    });
+    return;
+  }
+
   try {
     const accessToken = user.getJwtAccessToken();
     const refreshToken = user.getJwtRefreshToken();
 
-    user.tokens = user.tokens || [];
-    user.tokens.push(accessToken, refreshToken);
-
-    await user.save();
+    // Add or update the token for the specified device
+    await user.addOrUpdateDeviceToken(deviceId, accessToken, refreshToken);
 
     // Convert Mongoose document to a plain object
     const userObj = user.toObject();
@@ -40,6 +51,7 @@ const cookieToken = async (user: IUserModel, res: Response) => {
     });
   }
 };
+
 const veryfyJwtToken = (token: string) => {
   try {
     const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;

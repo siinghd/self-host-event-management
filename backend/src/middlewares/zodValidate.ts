@@ -1,16 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response, NextFunction } from 'express';
-import { ZodSchema, ZodTypeAny, ZodTypeDef, ZodError } from 'zod';
 
-interface ZodRequestSchema {
-  body?: ZodTypeAny;
-  query?: ZodTypeAny;
-  params?: ZodTypeAny;
+import { z, ZodError, ZodTypeAny } from 'zod';
+
+export function createRequestSchema(
+  body?: ZodTypeAny,
+  query?: ZodTypeAny,
+  params?: ZodTypeAny
+) {
+  return z.object({
+    body: body ?? z.object({}).optional(),
+    query: query ?? z.object({}).optional(),
+    params: params ?? z.object({}).optional(),
+  });
 }
-
-export const validate = <T extends ZodRequestSchema>(
-  schema: ZodSchema<T, ZodTypeDef, any>
-) => {
+export const validate = (schema: ReturnType<typeof createRequestSchema>) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       schema.parse({
@@ -26,7 +30,6 @@ export const validate = <T extends ZodRequestSchema>(
           message: e.errors.map((err) => err.message).join(', '),
         });
       }
-
       // Handle unexpected errors
       return res.status(500).json({
         success: false,

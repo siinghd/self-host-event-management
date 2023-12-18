@@ -15,37 +15,18 @@ import { EmailService } from '../utils/email/emailService';
 import { RESTRICTED_UPDATE_USER_PROPERTIES_BASED_ON_ROLE } from '../utils/constants';
 import { createHtmlTemplate } from '../utils/methods';
 import { createNotification } from '../utils/dbHelpers/notification';
-import { IUserModel } from 'models/user.model';
 import * as jwt from 'jsonwebtoken';
 import { UserModel } from '../models/user.model';
 
 const emailService = new EmailService();
 
-// User Authentication Methods
-
-const removeExpiredTokens = async (user: IUserModel) => {
-  const validTokens = user.tokens.filter((token) => {
-    try {
-      const decoded = jwt.decode(token);
-      const expiry = decoded.exp * 1000;
-      const now = new Date().getTime();
-      return expiry > now;
-    } catch (err) {
-      return false;
-    }
-  });
-
-  user.tokens = validTokens;
-  await user.save();
-};
-
 export const signup = BigPromise(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { name, email, password, surname, phoneNumber } = req.body;
+    const { name, email, password, surname, phoneNumber, deviceId } = req.body;
 
-    if (!email || !name || !password) {
+    if (!email || !name || !password || !deviceId) {
       return next(
-        new CustomError('Name, email, and password are required', 400)
+        new CustomError('Name, email, deviceId and password are required', 400)
       );
     }
 
@@ -60,17 +41,17 @@ export const signup = BigPromise(
         isActive: true,
       });
 
-      cookieToken(user, res);
+      cookieToken(user, res, deviceId);
     } catch (error) {
       next(error);
     }
   }
 );
 export const login = BigPromise(async (req, res, next) => {
-  const { email, password } = req.body;
+  const { email, password, deviceId } = req.body;
 
   // check for presence of email and password
-  if (!email || !password) {
+  if (!email || !password || !deviceId) {
     return next(new CustomError('Please provide email and password', 400));
   }
 
@@ -99,10 +80,9 @@ export const login = BigPromise(async (req, res, next) => {
       new CustomError('Email or password does not match or exist', 400)
     );
   }
-  // Remove expired tokens
-  await removeExpiredTokens(user);
+
   // if all goes good and we send the token
-  cookieToken(user, res);
+  cookieToken(user, res, deviceId);
 });
 
 // User Management Methods
@@ -186,59 +166,67 @@ export const registerInvitedUser = BigPromise(async (req, res, next) => {
   res.status(200).json({ success: true, user });
 });
 export const generateRefreshToken = BigPromise(async (req, res, next) => {
-  const { refreshToken } = req.body;
+  const { refreshToken, deviceId } = req.body;
+
+  if (!deviceId) {
+    return next(new CustomError('Device ID not provided', 400));
+  }
+
   // Find the user in the database
   const user = await UserModel.findOne({
     _id: req.user.id,
-    tokens: refreshToken,
   }).select('+tokens');
 
   if (!user) {
-    return next(new CustomError('invalid token', 400));
+    return next(new CustomError('Invalid token', 400));
   }
 
-  // Verify the refresh token
-  const decoded: string | JwtPayload = jwt.verify(
-    refreshToken,
-    process.env.JWT_REFRESH_SECRET as string
-  );
-  if (decoded.id !== user.id) {
-    return next(new CustomError('invalid user', 400));
-  }
-  // Generate a new access token
-  const accessToken = user.getJwtAccessToken();
-  user.tokens.push(accessToken);
-  await user.save();
+  // Find the specific token for the device
+  const deviceToken = user.tokens.find((token) => token.deviceId === deviceId);
 
-  // Return the new access token
-  return res.status(200).json({
-    success: true,
-    accessToken,
-  });
+  // Check if the refreshToken matches and is valid
+  if (!deviceToken || deviceToken.refreshToken !== refreshToken) {
+    return next(new CustomError('Invalid token or device', 400));
+  }
+
+  try {
+    // Verify the refresh token
+    jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string);
+
+    // Generate a new access token
+    const accessToken = user.getJwtAccessToken();
+
+    // Update the accessToken for the device
+    user.addOrUpdateDeviceToken(deviceId, accessToken, refreshToken);
+    await user.save();
+
+    // Return the new access token
+    return res.status(200).json({
+      success: true,
+      accessToken,
+    });
+  } catch (error) {
+    return next(new CustomError('Invalid token or token expired', 401));
+  }
 });
 
-export const logout = BigPromise(
-  async (req: IGetUserAuthInfoRequest, res: Response, next: NextFunction) => {
-    const accessToken = req.accessToken || req.body.accessToken;
-    const { refreshToken } = req.body;
-    if (!accessToken || !refreshToken) {
-      return next(new CustomError('tokens not provided', 400)); // Invalid tokens
-    }
-    // Remove both tokens from the user's document
-    const result = await UserModel.updateOne(
-      { _id: req.user._id },
-      { $pullAll: { tokens: [accessToken, refreshToken] } }
-    );
+export const logout = BigPromise(async (req, res, next) => {
+  const accessToken = req.accessToken || req.body.accessToken;
+  const { refreshToken, deviceId } = req.body;
 
-    if (result.nModified === 0) {
-      return next(new CustomError('invalid tokens', 400)); // Invalid tokens
-    }
-    res.status(200).json({
-      success: true,
-      message: 'Logout success',
-    });
+  if (!accessToken || !refreshToken || !deviceId) {
+    return next(new CustomError('Tokens or device ID not provided', 400));
   }
-);
+
+  // Remove tokens associated with the specific device
+  await UserModel.updateOne(
+    { _id: req.user._id },
+    { $pull: { tokens: { deviceId } } }
+  );
+
+  res.status(200).json({ success: true, message: 'Logout successful' });
+});
+
 export const logoutAllDevices = BigPromise(
   async (req: IGetUserAuthInfoRequest, res: Response, next: NextFunction) => {
     const result = await UserModel.updateOne(
