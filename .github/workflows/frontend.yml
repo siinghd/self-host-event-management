@@ -91,8 +91,9 @@ jobs:
           echo "DOTENV_KEY=${{ env.PROD_DOTENV_KEY }}" >> $GITHUB_ENV
 
       - name: SSH and Prepare Server
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.0.0
         with:
+          timeout: 120s
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           password: ${{ env.SERVER_PASSWORD }}
@@ -108,8 +109,9 @@ jobs:
           source: ${{ env.CURR_WORKING_DIRECTORY }}
           target: /home/${{ env.SERVER_USER }}/sites/${{ env.PROJECT_NAME }}/${{ env.ENVIRONMENT }}/
       - name: Deploy
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.0.0
         with:
+          timeout: 120s
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           password: ${{ env.SERVER_PASSWORD }}
