@@ -457,7 +457,7 @@ export const passwordResetJwtToken = BigPromise(async (req, res, next) => {
 export const getLoggedInUserDetails = BigPromise(async (req, res) => {
   // req.user will be added by middleware
   // find user by id
-  const user = await UserModel.findById(req.user.id).populate('factory');
+  const user = await UserModel.findById(req.user.id)
 
   // send response and user data
   res.status(200).json({
