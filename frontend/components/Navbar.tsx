@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-
+import Logo from '../assets/logo.png'
+import Image from "next/image"
 import { cn } from "../lib/utils"
 
 import {
@@ -53,82 +54,89 @@ const components: { title: string; href: string; description: string }[] = [
     },
 ]
 
-export function NavigationMenuDemo() {
+export function Navbar() {
     return (
-        <NavigationMenu className="px-4 py-2 rounded-3xl m-auto sticky top-4 z-30 ">
-            <NavigationMenuList>
-                <NavigationMenuItem>
-                    <Link href="/" legacyBehavior passHref>
-                        <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                            Home
-                        </NavigationMenuLink>
-                    </Link>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                    <Link href="/about" legacyBehavior passHref>
-                        <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                            About us
-                        </NavigationMenuLink>
-                    </Link>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                    <NavigationMenuTrigger>Services</NavigationMenuTrigger>
-                    <NavigationMenuContent>
-                        <ul className="grid gap-3 p-4 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
-                            <li className="row-span-3">
-                                <NavigationMenuLink asChild>
-                                    <a
-                                        className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
-                                        href="/"
-                                    >
+        <div className="flex justify-evenly items-center  sticky top-4 z-30">
+            <Image src={Logo} alt="logo" className="h-[60px] w-[60px]" />
+            <NavigationMenu className="px-4 py-2 rounded-3xl   bg-gray-200 dark:bg-gray-900">
+                <NavigationMenuList>
+                    <NavigationMenuItem className="text-gray-800 dark:text-foreground">
+                        <Link href="/" legacyBehavior passHref>
+                            <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                                Home
+                            </NavigationMenuLink>
+                        </Link>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem className="text-gray-800 dark:text-foreground">
+                        <Link href="/about" legacyBehavior passHref>
+                            <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                                About us
+                            </NavigationMenuLink>
+                        </Link>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem className="text-gray-800 dark:text-foreground">
+                        <NavigationMenuTrigger>Services</NavigationMenuTrigger>
+                        <NavigationMenuContent>
+                            <ul className="grid gap-3 p-4 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
+                                <li className="row-span-3">
+                                    <NavigationMenuLink asChild>
+                                        <a
+                                            className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
+                                            href="/"
+                                        >
 
-                                        <div className="mb-2 mt-4 text-lg font-medium">
-                                            shadcn/ui
-                                        </div>
-                                        <p className="text-sm leading-tight text-muted-foreground">
-                                            Beautifully designed components built with Radix UI and
-                                            Tailwind CSS.
-                                        </p>
-                                    </a>
-                                </NavigationMenuLink>
-                            </li>
-                            <ListItem href="/docs" title="Introduction">
-                                Re-usable components built using Radix UI and Tailwind CSS.
-                            </ListItem>
-                            <ListItem href="/docs/installation" title="Installation">
-                                How to install dependencies and structure your app.
-                            </ListItem>
-                            <ListItem href="/docs/primitives/typography" title="Typography">
-                                Styles for headings, paragraphs, lists...etc
-                            </ListItem>
-                        </ul>
-                    </NavigationMenuContent>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                    <NavigationMenuTrigger>Features</NavigationMenuTrigger>
-                    <NavigationMenuContent>
-                        <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
-                            {components.map((component) => (
-                                <ListItem
-                                    key={component.title}
-                                    title={component.title}
-                                    href={component.href}
-                                >
-                                    {component.description}
+                                            <div className="mb-2 mt-4 text-lg font-medium">
+                                                shadcn/ui
+                                            </div>
+                                            <p className="text-sm leading-tight text-muted-foreground">
+                                                Beautifully designed components built with Radix UI and
+                                                Tailwind CSS.
+                                            </p>
+                                        </a>
+                                    </NavigationMenuLink>
+                                </li>
+                                <ListItem href="/docs" title="Introduction">
+                                    Re-usable components built using Radix UI and Tailwind CSS.
                                 </ListItem>
-                            ))}
-                        </ul>
-                    </NavigationMenuContent>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                    <Link href="/login" legacyBehavior passHref>
-                        <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                            Login
-                        </NavigationMenuLink>
-                    </Link>
-                </NavigationMenuItem>
-            </NavigationMenuList>
-        </NavigationMenu>
+                                <ListItem href="/docs/installation" title="Installation">
+                                    How to install dependencies and structure your app.
+                                </ListItem>
+                                <ListItem href="/docs/primitives/typography" title="Typography">
+                                    Styles for headings, paragraphs, lists...etc
+                                </ListItem>
+                            </ul>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem className="text-gray-800 dark:text-foreground">
+                        <NavigationMenuTrigger>Features</NavigationMenuTrigger>
+                        <NavigationMenuContent>
+                            <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
+                                {components.map((component) => (
+                                    <ListItem
+                                        key={component.title}
+                                        title={component.title}
+                                        href={component.href}
+                                    >
+                                        {component.description}
+                                    </ListItem>
+                                ))}
+                            </ul>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem className="text-gray-800 dark:text-foreground">
+                        <Link href="/login" legacyBehavior passHref>
+                            <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                                Policy
+                            </NavigationMenuLink>
+                        </Link>
+                    </NavigationMenuItem>
+                </NavigationMenuList>
+            </NavigationMenu>
+            <div className="bg-secondary text-gray-100 dark:bg-secondary px-4 py-2 rounded-3xl cursor-pointer hover:drop-shadow-xl">
+                <p>Login</p>
+            </div>
+        </div>
+
     )
 }
 
