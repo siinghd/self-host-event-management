@@ -1,4 +1,4 @@
-type InputFields = {
+export type InputFields = {
   name: "name" | "surname" | "email" | "password" | "confirmPassword" | "phone";
   type?: "password" | "text";
   placeholderText?: string;
